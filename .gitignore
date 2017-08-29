@@ -1,0 +1,9 @@
+
+*.out
+*.o
+*.swp
+
+sm2test
+sm3test
+sm4test
+
