@@ -31,7 +31,7 @@ void BNPrintf(BIGNUM* bn)
 	OPENSSL_free(p);
 }
 
-
+#if 0
 int SM2_Test_Vecotor()
 {
 	BN_CTX *ctx = NULL;
@@ -176,6 +176,7 @@ builtin_err:
 	return 0;
 
 }
+#endif
 
 int SM2_Test_Vecotor2()
 {
@@ -185,7 +186,7 @@ int SM2_Test_Vecotor2()
 	EC_POINT *P, *Q, *R;
 	BIGNUM *x, *y, *z;
 	EC_KEY	*eckey = NULL;
-	unsigned char	*signature;
+	unsigned char	*signature, *signature_tmp;
 	unsigned char	digest[32] = "\xB5\x24\xF5\x52\xCD\x82\xB8\xB0\x28\x47\x6E\x00\x5C\x37\x7F\xB1\x9A\x87\xE6\xFC\x68\x2D\x48\xBB\x5D\x42\xE3\xD9\xB9\xEF\xFE\x76"; 
 	int	sig_len;
 	BIGNUM *kinv, *rp,*order; 
@@ -341,6 +342,7 @@ int SM2_Test_Vecotor2()
 // 		printf("%02X",digest[i]);
 // 	printf("\n");
 
+//////////////////////////////////////////////////////
 	if (!SM2_sign_ex(1, digest, 32, signature, &sig_len, kinv, rp, eckey))
 	{
 		fprintf(stdout, " failed\n");
@@ -355,11 +357,17 @@ int SM2_Test_Vecotor2()
 		goto builtin_err;
 	}
 	fprintf(stdout, "ECVerify OK\n     r = 0x");
+#if 1
+        signature_tmp = signature;
+	d2i_ECDSA_SIG(&ecsig, &signature_tmp, sig_len);
+#else
 	d2i_ECDSA_SIG(&ecsig, &signature, sig_len);
+#endif
 	BNPrintf(ecsig->r);
 	fprintf(stdout,"\n     s = 0x");
 	BNPrintf(ecsig->s);
 	fprintf(stdout,"\n");
+//////////////////////////////////////////////////////
 
 	//testing SM2DH vector
 	/* create key */
@@ -406,11 +414,11 @@ int SM2_Test_Vecotor2()
 	SM2_DH_key(group,P, Q, z,eckey,outkey,keylen);
 
 	fprintf(stdout,"\nExchange key --KDF(Xv||Yv)--  :");
+#if 1
 	for(i=0; i<outlen; i++)
 		printf("%02X",outkey[i]);
 	printf("\n");
-
-
+#endif
 
 builtin_err:	
 	OPENSSL_free(signature);
@@ -423,6 +431,7 @@ builtin_err:
 	eckey = NULL;
 	EC_GROUP_free(group);
 	BN_CTX_free(ctx);
+
 	return 0;
 
 }
