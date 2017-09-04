@@ -187,7 +187,19 @@ int SM2_Test_Vecotor2()
 	BIGNUM *x, *y, *z;
 	EC_KEY	*eckey = NULL;
 	unsigned char	*signature, *signature_tmp;
+#if 1
+	unsigned char	digest[32] = {
+            0xB5, 0x24, 0xF5, 0x52,
+            0xCD, 0x82, 0xB8, 0xB0,
+            0x28, 0x47, 0x6E, 0x00,
+            0x5C, 0x37, 0x7F, 0xB1,
+            0x9A, 0x87, 0xE6, 0xFC,
+            0x68, 0x2D, 0x48, 0xBB,
+            0x5D, 0x42, 0xE3, 0xD9,
+            0xB9, 0xEF, 0xFE, 0x76};
+#else
 	unsigned char	digest[32] = "\xB5\x24\xF5\x52\xCD\x82\xB8\xB0\x28\x47\x6E\x00\x5C\x37\x7F\xB1\x9A\x87\xE6\xFC\x68\x2D\x48\xBB\x5D\x42\xE3\xD9\xB9\xEF\xFE\x76"; 
+#endif
 	int	sig_len;
 	BIGNUM *kinv, *rp,*order; 
 	ECDSA_SIG *ecsig = ECDSA_SIG_new();

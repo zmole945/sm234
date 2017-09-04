@@ -14,7 +14,8 @@ $(PROJECT) :
 	$(CC) ${OBJ} -o $(PROJECT) $(INC) $(MODULE)
 
 clean:
-	rm -rf *.o *.a *.so sm2test
+	rm -rf *.o *.a *.so
+	rm -rf sm2test
 
 %.o : %.cpp
 	$(CC) $(SHARED_FLAG) -c $< $(INC)
