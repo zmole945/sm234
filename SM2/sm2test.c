@@ -198,6 +198,7 @@ int SM2_Test_Vecotor2()
             0x5D, 0x42, 0xE3, 0xD9,
             0xB9, 0xEF, 0xFE, 0x76};
 #else
+        //B524F552CD82B8B028476E005C377FB19A87E6FC682D48BB5D42E3D9B9EFFE76
 	unsigned char	digest[32] = "\xB5\x24\xF5\x52\xCD\x82\xB8\xB0\x28\x47\x6E\x00\x5C\x37\x7F\xB1\x9A\x87\xE6\xFC\x68\x2D\x48\xBB\x5D\x42\xE3\xD9\xB9\xEF\xFE\x76"; 
 #endif
 	int	sig_len;
@@ -230,12 +231,27 @@ int SM2_Test_Vecotor2()
  	                                             * so that the library gets to choose the EC_METHOD */
 	if (!group) ABORT;
 	
+        printf("================================================\n");
+        printf("set curve GFp\n");
 	if (!BN_hex2bn(&p, "8542D69E4C044F18E8B92435BF6FF7DE457283915C45517D722EDB8B08F1DFC3")) ABORT;
 	if (1 != BN_is_prime_ex(p, BN_prime_checks, ctx, NULL)) ABORT;
 	if (!BN_hex2bn(&a, "787968B4FA32C3FD2417842E73BBFEFF2F3C848B6831D7E0EC65228B3937E498")) ABORT;
 	if (!BN_hex2bn(&b, "63E4C6D3B23B0C849CF84241484BFE48F61D59A5B16BA06E6E12D1DA27C5249A")) ABORT;
 	if (!EC_GROUP_set_curve_GFp(group, p, a, b, ctx)) ABORT;
+	fprintf(stdout, "p = 0x");
+	BNPrintf(p);
+        printf("\n");
+	fprintf(stdout, "a = 0x");
+	BNPrintf(a);
+        printf("\n");
+	fprintf(stdout, "b = 0x");
+	BNPrintf(b);
+        printf("\n");
+        printf("\n\n\n");
 
+
+        printf("===============================\n");
+        printf("Chinese sm2 algorithm test -- Generator:\n");
 	P = EC_POINT_new(group);
 	Q = EC_POINT_new(group);
 	R = EC_POINT_new(group);
@@ -256,16 +272,22 @@ int SM2_Test_Vecotor2()
 
 	if (!BN_hex2bn(&x, "421DEBD61B62EAB6746434EBC3CC315E32220B3BADD50BDC4C4E6C147FEDD43D")) ABORT;
 	if (!EC_POINT_set_compressed_coordinates_GFp(group, P, x, 0, ctx)) ABORT;
+#if 1
 	if (!EC_POINT_is_on_curve(group, P, ctx)) ABORT;
+
 	if (!BN_hex2bn(&z, "8542D69E4C044F18E8B92435BF6FF7DD297720630485628D5AE74EE7C32E79B7")) ABORT;
 	if (!EC_GROUP_set_generator(group, P, z, BN_value_one())) ABORT;
+#endif
 	
 	if (!EC_POINT_get_affine_coordinates_GFp(group, P, x, y, ctx)) ABORT;
-	fprintf(stdout, "\nChinese sm2 algorithm test -- Generator:\n     x = 0x");
+	fprintf(stdout, "x = 0x");
 	BNPrintf(x);
-	fprintf(stdout, "\n     y = 0x");
-	BNPrintf( y);
-	fprintf(stdout, "\n");
+        printf("\n");
+	fprintf(stdout, "y = 0x");
+	BNPrintf(y);
+        printf("\n");
+        printf("\n\n\n");
+
 	/* G_y value taken from the standard: */
 	if (!BN_hex2bn(&z, "0680512BCBB42C07D47349D2153B70C4E5D7FDFCBFA36EA1A85841B9E46E09A2")) ABORT;
 	if (0 != BN_cmp(y, z)) ABORT;
@@ -328,6 +350,7 @@ int SM2_Test_Vecotor2()
 		goto builtin_err;
 	}
 
+///////////////////////////////////////////////////////////////////
 	/* create signature */
 	sig_len = ECDSA_size(eckey);
  	//fprintf(stdout,"Siglength is: %d \n",sig_len);
@@ -355,6 +378,7 @@ int SM2_Test_Vecotor2()
 	BNPrintf( y);
 	fprintf(stdout, "\n");
 
+
 	EC_GROUP_get_order(group, order, ctx);
 	if (!BN_nnmod(rp, x, order, ctx))
 	{
@@ -378,6 +402,10 @@ int SM2_Test_Vecotor2()
 		goto builtin_err;
 	}
 	fprintf(stdout, "ECSign OK\n");
+        for (i=0; i<sig_len; i++) {
+            printf("%2.2x", signature[i]);
+        }
+        printf("\n");
 
 	/* verify signature */
 	if (SM2_verify(1, digest, 32, signature, sig_len, eckey) != 1)
@@ -385,13 +413,13 @@ int SM2_Test_Vecotor2()
 		fprintf(stdout, " failed\n");
 		goto builtin_err;
 	}
-	fprintf(stdout, "ECVerify OK\n     r = 0x");
 #if 1
         signature_tmp = signature;
 	d2i_ECDSA_SIG(&ecsig, &signature_tmp, sig_len);
 #else
 	d2i_ECDSA_SIG(&ecsig, &signature, sig_len);
 #endif
+	fprintf(stdout, "ECVerify OK\n     r = 0x");
 	BNPrintf(ecsig->r);
 	fprintf(stdout,"\n     s = 0x");
 	BNPrintf(ecsig->s);
