@@ -292,6 +292,23 @@ int SM2_Test_Vecotor2()
 		fprintf(stdout," failed\n");
 		goto builtin_err;
 	}
+
+#if 1
+        printf("================================\n");
+        printf("test create key:\n");
+	if (!BN_hex2bn(&z, "0ae4c7798aa0f119471bee11825be46202bb79e2a5844495e97c04ff4df2548a")) ABORT;
+	if (!EC_POINT_mul(group, P, z, NULL, NULL, ctx)) ABORT;
+	if (!EC_POINT_get_affine_coordinates_GFp(group,P, x, y, ctx)) ABORT;
+	fprintf(stdout, "\n priv  = ");
+	BNPrintf(z);
+	fprintf(stdout, "\n pub.x = ");
+	BNPrintf(x);
+	fprintf(stdout, "\n pub.y = ");
+	BNPrintf(y);
+	fprintf(stdout, "\n");
+        printf("================================\n");
+#endif
+
 	/* create key */
 	if (!BN_hex2bn(&z, "128B2FA8BD433C6C068C8D803DFF79792A519A55171B1B650C23661D15897263")) ABORT;
 	if (!EC_POINT_mul(group,P, z, NULL, NULL, ctx)) ABORT;
