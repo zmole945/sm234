@@ -147,7 +147,7 @@ err:
 }
 
 
-static ECDSA_SIG *sm2_do_sign(const unsigned char *dgst, int dgst_len, const BIGNUM *in_k, const BIGNUM *in_r, EC_KEY *eckey)
+ECDSA_SIG *sm2_do_sign(const unsigned char *dgst, int dgst_len, const BIGNUM *in_k, const BIGNUM *in_r, EC_KEY *eckey)
 {
 	int     ok = 0, i;
 	BIGNUM *k=NULL, *s, *m=NULL,*tmp=NULL,*order=NULL;
