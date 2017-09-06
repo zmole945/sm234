@@ -291,7 +291,7 @@ int SM2_Test_Vecotor2()
         printf("\n");
         printf("\n\n\n");
 
-#if 1
+#if 0
         printf("================================================\n");
         printf("Verify EC:\n");
 	/* G_y value taken from the standard: */
