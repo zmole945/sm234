@@ -238,19 +238,19 @@ int SM2_Test_Vecotor2()
 	if (!BN_hex2bn(&a, "787968B4FA32C3FD2417842E73BBFEFF2F3C848B6831D7E0EC65228B3937E498")) ABORT;
 	if (!BN_hex2bn(&b, "63E4C6D3B23B0C849CF84241484BFE48F61D59A5B16BA06E6E12D1DA27C5249A")) ABORT;
 	if (!EC_GROUP_set_curve_GFp(group, p, a, b, ctx)) ABORT;
-	fprintf(stdout, "p = 0x");
+	fprintf(stdout, "p = ");
 	BNPrintf(p);
         printf("\n");
-	fprintf(stdout, "a = 0x");
+	fprintf(stdout, "a = ");
 	BNPrintf(a);
         printf("\n");
-	fprintf(stdout, "b = 0x");
+	fprintf(stdout, "b = ");
 	BNPrintf(b);
         printf("\n");
         printf("\n\n\n");
 
 
-        printf("===============================\n");
+        printf("================================================\n");
         printf("Chinese sm2 algorithm test -- Generator:\n");
 	P = EC_POINT_new(group);
 	Q = EC_POINT_new(group);
@@ -280,18 +280,29 @@ int SM2_Test_Vecotor2()
 #endif
 	
 	if (!EC_POINT_get_affine_coordinates_GFp(group, P, x, y, ctx)) ABORT;
-	fprintf(stdout, "x = 0x");
+	fprintf(stdout, "n = ");
+	BNPrintf(z);
+        printf("\n");
+	fprintf(stdout, "x = ");
 	BNPrintf(x);
         printf("\n");
-	fprintf(stdout, "y = 0x");
+	fprintf(stdout, "y = ");
 	BNPrintf(y);
         printf("\n");
         printf("\n\n\n");
 
+#if 1
+        printf("================================================\n");
+        printf("Verify EC:\n");
 	/* G_y value taken from the standard: */
 	if (!BN_hex2bn(&z, "0680512BCBB42C07D47349D2153B70C4E5D7FDFCBFA36EA1A85841B9E46E09A2")) ABORT;
+        printf("standard y:");
+	BNPrintf(z);
+        printf("\n");
 	if (0 != BN_cmp(y, z)) ABORT;
+#endif
 	
+#if 0
 	fprintf(stdout, "verify degree ...");
 	if (EC_GROUP_get_degree(group) != 256) ABORT;
 	fprintf(stdout, " ok\n");
@@ -304,6 +315,11 @@ int SM2_Test_Vecotor2()
 	if (!EC_POINT_is_at_infinity(group, Q)) ABORT;
  	fflush(stdout);
 	fprintf(stdout, " ok\n");
+        printf("\n\n\n");
+#endif
+
+        printf("================================================\n");
+        printf("Create key:\n");
 
 	//testing ECDSA for SM2
 	/* create new ecdsa key */
@@ -315,32 +331,22 @@ int SM2_Test_Vecotor2()
 		goto builtin_err;
 	}
 
-#if 1
-        printf("================================\n");
-        printf("test create key:\n");
-	if (!BN_hex2bn(&z, "0ae4c7798aa0f119471bee11825be46202bb79e2a5844495e97c04ff4df2548a")) ABORT;
-	if (!EC_POINT_mul(group, P, z, NULL, NULL, ctx)) ABORT;
-	if (!EC_POINT_get_affine_coordinates_GFp(group,P, x, y, ctx)) ABORT;
-	fprintf(stdout, "\n priv  = ");
-	BNPrintf(z);
-	fprintf(stdout, "\n pub.x = ");
-	BNPrintf(x);
-	fprintf(stdout, "\n pub.y = ");
-	BNPrintf(y);
-	fprintf(stdout, "\n");
-        printf("================================\n");
-#endif
-
 	/* create key */
 	if (!BN_hex2bn(&z, "128B2FA8BD433C6C068C8D803DFF79792A519A55171B1B650C23661D15897263")) ABORT;
 	if (!EC_POINT_mul(group,P, z, NULL, NULL, ctx)) ABORT;
 	if (!EC_POINT_get_affine_coordinates_GFp(group,P, x, y, ctx)) ABORT;
-	fprintf(stdout, "\nTesting ECKey Point\n     x = 0x");
+	fprintf(stdout, "priv = ");
+	BNPrintf(z);
+        printf("\n");
+	fprintf(stdout, "pubx = ");
 	BNPrintf(x);
-	fprintf(stdout, "\n     y = 0x");
-	BNPrintf( y);
-	fprintf(stdout, "\n");
-	EC_KEY_set_private_key(eckey,z);
+        printf("\n");
+	fprintf(stdout, "puby = ");
+	BNPrintf(y);
+        printf("\n");
+        printf("\n\n\n");
+
+	EC_KEY_set_private_key(eckey, z);
 	EC_KEY_set_public_key(eckey, P);
 
 	/* check key */
@@ -351,6 +357,8 @@ int SM2_Test_Vecotor2()
 	}
 
 ///////////////////////////////////////////////////////////////////
+        printf("================================================\n");
+        printf("Testing K Point:\n");
 	/* create signature */
 	sig_len = ECDSA_size(eckey);
  	//fprintf(stdout,"Siglength is: %d \n",sig_len);
@@ -372,12 +380,16 @@ int SM2_Test_Vecotor2()
 		fprintf(stdout, " failed\n");
 		goto builtin_err;
 	}
-	fprintf(stdout, "\nTesting K Point\n     x = 0x");
+	fprintf(stdout, "z = ");
+	BNPrintf(z);
+        printf("\n");
+	fprintf(stdout, "x = ");
 	BNPrintf(x);
-	fprintf(stdout, "\n     y = 0x");
-	BNPrintf( y);
-	fprintf(stdout, "\n");
-
+        printf("\n");
+	fprintf(stdout, "y = ");
+	BNPrintf(y);
+        printf("\n");
+        printf("\n\n\n");
 
 	EC_GROUP_get_order(group, order, ctx);
 	if (!BN_nnmod(rp, x, order, ctx))
@@ -385,27 +397,42 @@ int SM2_Test_Vecotor2()
 		fprintf(stdout, " failed\n");
 		goto builtin_err;
 	}
-	if (!BN_copy(kinv, z ))
+	if (!BN_copy(kinv, z))
 	{
 		fprintf(stdout, " failed\n");
 		goto builtin_err;
 	}
 
-// 	for(i=0;i<32;i++)
-// 		printf("%02X",digest[i]);
-// 	printf("\n");
 
 //////////////////////////////////////////////////////
+        printf("================================================\n");
+        printf("Testing sign:\n");
+        printf("digest=\n");
+ 	for(i=0;i<32;i++) {
+ 	    printf("%02X",digest[i]);
+        }
+ 	printf("\n");
+
+	fprintf(stdout, "kinv = ");
+	BNPrintf(kinv);
+        printf("\n");
+	fprintf(stdout, "rp = ");
+	BNPrintf(rp);
+        printf("\n");
+
 	if (!SM2_sign_ex(1, digest, 32, signature, &sig_len, kinv, rp, eckey))
 	{
 		fprintf(stdout, " failed\n");
 		goto builtin_err;
 	}
-	fprintf(stdout, "ECSign OK\n");
+        printf("sig_len=%d\n", sig_len);
+        printf("signature=\n");
         for (i=0; i<sig_len; i++) {
             printf("%2.2x", signature[i]);
         }
         printf("\n");
+	fprintf(stdout, "ECSign OK\n");
+        printf("\n\n\n");
 
 	/* verify signature */
 	if (SM2_verify(1, digest, 32, signature, sig_len, eckey) != 1)
@@ -419,13 +446,18 @@ int SM2_Test_Vecotor2()
 #else
 	d2i_ECDSA_SIG(&ecsig, &signature, sig_len);
 #endif
-	fprintf(stdout, "ECVerify OK\n     r = 0x");
+        printf("ECVerify OK\n");
+	fprintf(stdout, "r = ");
 	BNPrintf(ecsig->r);
-	fprintf(stdout,"\n     s = 0x");
+        printf("\n");
+	fprintf(stdout, "s = ");
 	BNPrintf(ecsig->s);
-	fprintf(stdout,"\n");
+        printf("\n");
+        printf("\n\n\n");
+
 //////////////////////////////////////////////////////
 
+#if 0
 	//testing SM2DH vector
 	/* create key */
 	if (!BN_hex2bn(&z, "6FCBA2EF9AE0AB902BC3BDE3FF915D44BA4CC78F88E2F8E7F8996D3B8CCEEDEE")) ABORT;
@@ -468,13 +500,15 @@ int SM2_Test_Vecotor2()
 	BNPrintf( y);
 	fprintf(stdout, "\n");
     
-	SM2_DH_key(group,P, Q, z,eckey,outkey,keylen);
+	SM2_DH_key(group, P, Q, z,eckey,outkey,keylen);
 
 	fprintf(stdout,"\nExchange key --KDF(Xv||Yv)--  :");
 #if 1
-	for(i=0; i<outlen; i++)
-		printf("%02X",outkey[i]);
+	for(i=0; i<outlen; i++) {
+            printf("%02X",outkey[i]);
+        }
 	printf("\n");
+#endif
 #endif
 
 builtin_err:	
