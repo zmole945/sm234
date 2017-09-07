@@ -147,180 +147,253 @@ err:
 }
 
 
-ECDSA_SIG *sm2_do_sign(const unsigned char *dgst, int dgst_len, const BIGNUM *in_k, const BIGNUM *in_r, EC_KEY *eckey)
+ECDSA_SIG *sm2_do_sign( const unsigned char *dgst,
+                        int                 dgst_len,
+                        const BIGNUM        *in_k,
+                        const BIGNUM        *in_r,
+                        EC_KEY              *eckey)
 {
-	int     ok = 0, i;
-	BIGNUM *k=NULL, *s, *m=NULL,*tmp=NULL,*order=NULL;
-	const BIGNUM *ck;
-	BN_CTX     *ctx = NULL;
-	const EC_GROUP   *group;
-	ECDSA_SIG  *ret;
-	//ECDSA_DATA *ecdsa;
-	const BIGNUM *priv_key;
-    BIGNUM *r,*x=NULL,*a=NULL;	//new added
-	//ecdsa    = ecdsa_check(eckey);
-	group    = EC_KEY_get0_group(eckey);
-	priv_key = EC_KEY_get0_private_key(eckey);
-	
-	if (group == NULL || priv_key == NULL /*|| ecdsa == NULL*/)
-	{
-		ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_PASSED_NULL_PARAMETER);
-		return NULL;
-	}
+    int             ok = 0, i;
+    BIGNUM          *k=NULL, *s, *m=NULL,*tmp=NULL,*order=NULL;
+    const BIGNUM    *ck;
+    BN_CTX          *ctx = NULL;
+    const EC_GROUP  *group;
+    ECDSA_SIG       *ret;
 
-	ret = ECDSA_SIG_new();
-	if (!ret)
-	{
-		ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_MALLOC_FAILURE);
-		return NULL;
-	}
-	s = ret->s;
-	r = ret->r;
+    //ECDSA_DATA *ecdsa;
+    const BIGNUM    *priv_key;
+    BIGNUM          *r,*x=NULL,*a=NULL;	//new added
 
-	if ((ctx = BN_CTX_new()) == NULL || (order = BN_new()) == NULL ||
-		(tmp = BN_new()) == NULL || (m = BN_new()) == NULL || 
-		(x = BN_new()) == NULL || (a = BN_new()) == NULL)
-	{
-		ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_MALLOC_FAILURE);
-		goto err;
-	}
+    //ecdsa    = ecdsa_check(eckey);
+    group    = EC_KEY_get0_group(eckey);
+    priv_key = EC_KEY_get0_private_key(eckey);
 
-	if (!EC_GROUP_get_order(group, order, ctx))
-	{
-		ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_EC_LIB);
-		goto err;
-	}
-// 	for(i=0;i<dgst_len;i++)
-// 		printf("%02X",dgst[i]);
-//  	printf("\n");
-	i = BN_num_bits(order);
-	/* Need to truncate digest if it is too long: first truncate whole
-	 * bytes.
-	 */
-	if (8 * dgst_len > i)
-		dgst_len = (i + 7)/8;
-	if (!BN_bin2bn(dgst, dgst_len, m))
-	{
-		ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_BN_LIB);
-		goto err;
-	}
-	/* If still too long truncate remaining bits with a shift */
-	if ((8 * dgst_len > i) && !BN_rshift(m, m, 8 - (i & 0x7)))
-	{
-		ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_BN_LIB);
-		goto err;
-	}
-// 	fprintf(stdout,"m: ");
-// 	BNPrintf(m);
-// 	fprintf(stdout,"\n");
-	do
-	{
-		if (in_k == NULL || in_r == NULL)
-		{
-			if (!sm2_sign_setup(eckey, ctx, &k, &x))
-			{
-				ECDSAerr(ECDSA_F_ECDSA_DO_SIGN,ERR_R_ECDSA_LIB);
-				goto err;
-			}
-			ck = k;
-		}
-		else
-		{
-			ck  = in_k;
-			if (BN_copy(x, in_r) == NULL)
-			{
-				ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_MALLOC_FAILURE);
-				goto err;
-			}
-		}
-		
-		//r=(e+x1) mod n
-		if (!BN_mod_add_quick(r, m, x, order))
-		{
-			ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_BN_LIB);
-			goto err;
-		}
+#if 0
+    printf("priv_key:");
+    BNPrintf(priv_key);
+    printf("\n");
+    printf("in_k:");
+    BNPrintf(in_k);
+    printf("\n");
+    printf("in_r:");
+    BNPrintf(in_r);
+    printf("\n");
+#endif
 
-// 	    BNPrintf(r);
-// 		fprintf(stdout,"\n");
+    if (group == NULL || priv_key == NULL /*|| ecdsa == NULL*/)
+    {
+        ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_PASSED_NULL_PARAMETER);
+        return NULL;
+    }
 
-		if(BN_is_zero(r) )
-			continue;
+    ret = ECDSA_SIG_new();
+    if (!ret)
+    {
+        ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_MALLOC_FAILURE);
+        return NULL;
+    }
+    s = ret->s;
+    r = ret->r;
 
-		BN_add(tmp,r,ck);
-		if(BN_ucmp(tmp,order) == 0)
-			continue;
-		
-		if (!BN_mod_mul(tmp, priv_key, r, order, ctx))
-		{
-			ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_BN_LIB);
-			goto err;
-		}
-		if (!BN_mod_sub_quick(s, ck, tmp, order))
-		{
-			ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_BN_LIB);
-			goto err;
-		}
-		BN_one(a);
-		//BN_set_word((a),1);
+    if ((ctx = BN_CTX_new()) == NULL || (order = BN_new()) == NULL ||
+            (tmp = BN_new()) == NULL || (m = BN_new()) == NULL || 
+            (x = BN_new()) == NULL || (a = BN_new()) == NULL)
+    {
+        ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_MALLOC_FAILURE);
+        goto err;
+    }
 
-		if (!BN_mod_add_quick(tmp, priv_key, a, order))
-		{
-			ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_BN_LIB);
-			goto err;
-		}
-		/* compute the inverse of 1+dA */
-		if (!BN_mod_inverse(tmp, tmp, order, ctx))
-		{
-			ECDSAerr(ECDSA_F_ECDSA_SIGN_SETUP, ERR_R_BN_LIB);
-			goto err;	
-		}
-// 		BNPrintf(tmp);
-// 		fprintf(stdout,"\n");
+    if (!EC_GROUP_get_order(group, order, ctx))
+    {
+        ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_EC_LIB);
+        goto err;
+    }
 
-		if (!BN_mod_mul(s, s, tmp, order, ctx))
-		{
-			ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_BN_LIB);
-			goto err;
-		}
-		if (BN_is_zero(s))
-		{
-			/* if k and r have been supplied by the caller
-			 * don't to generate new k and r values */
-			if (in_k != NULL && in_r != NULL)
-			{
-				ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ECDSA_R_NEED_NEW_SETUP_VALUES);
-				goto err;
-			}
-		}
-		else
-			/* s != 0 => we have a valid signature */
-			break;
-	}
-	while (1);
+#if 0
+    printf("dgst_len: %d\n", dgst_len);
+    printf("dgst: \n");
+    for(i=0;i<dgst_len;i++) {
+        printf("%02X",dgst[i]);
+    }
+    printf("\n");
+#endif
 
-	ok = 1;
+    i = BN_num_bits(order);
+
+    /* Need to truncate digest if it is too long: first truncate whole
+     * bytes.
+     */
+    if (8 * dgst_len > i)
+        dgst_len = (i + 7)/8;
+    if (!BN_bin2bn(dgst, dgst_len, m))
+    {
+        ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_BN_LIB);
+        goto err;
+    }
+    /* If still too long truncate remaining bits with a shift */
+    if ((8 * dgst_len > i) && !BN_rshift(m, m, 8 - (i & 0x7)))
+    {
+        ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_BN_LIB);
+        goto err;
+    }
+    // 	fprintf(stdout,"m: ");
+    // 	BNPrintf(m);
+    // 	fprintf(stdout,"\n");
+    do
+    {
+        if (in_k == NULL || in_r == NULL)
+        {
+            if (!sm2_sign_setup(eckey, ctx, &k, &x))
+            {
+                ECDSAerr(ECDSA_F_ECDSA_DO_SIGN,ERR_R_ECDSA_LIB);
+                goto err;
+            }
+            ck = k;
+        }
+        else
+        {
+            ck  = in_k;
+            if (BN_copy(x, in_r) == NULL)
+            {
+                ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_MALLOC_FAILURE);
+                goto err;
+            }
+        }
+
+        //r=(e+x1) mod n
+        if (!BN_mod_add_quick(r, m, x, order))
+        {
+            ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_BN_LIB);
+            goto err;
+        }
+
+#if 1
+        printf("order:");
+        BNPrintf(order);
+        printf("\n");
+        printf("x:");
+        BNPrintf(x);
+        printf("\n");
+        printf("m:");
+        BNPrintf(m);
+        printf("\n");
+        printf("r:");
+        BNPrintf(r);
+        printf("\n");
+#endif
+
+        if(BN_is_zero(r) )
+            continue;
+
+        BN_add(tmp, r, ck);
+        if(BN_ucmp(tmp,order) == 0)
+            continue;
+
+        if (!BN_mod_mul(tmp, priv_key, r, order, ctx))
+        {
+            ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_BN_LIB);
+            goto err;
+        }
+#if 1
+        printf("tmp:");
+        BNPrintf(tmp);
+        printf("\n");
+        printf("ck:");
+        BNPrintf(ck);
+        printf("\n");
+        printf("r:");
+        BNPrintf(r);
+        printf("\n");
+#endif
+        if (!BN_mod_sub_quick(s, ck, tmp, order))
+        {
+            ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_BN_LIB);
+            goto err;
+        }
+        BN_one(a);
+#if 0
+        printf("a:");
+        BNPrintf(a);
+        printf("\n");
+#endif
+
+        if (!BN_mod_add_quick(tmp, priv_key, a, order))
+        {
+            ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_BN_LIB);
+            goto err;
+        }
+        /* compute the inverse of 1+dA */
+        if (!BN_mod_inverse(tmp, tmp, order, ctx))
+        {
+            ECDSAerr(ECDSA_F_ECDSA_SIGN_SETUP, ERR_R_BN_LIB);
+            goto err;	
+        }
+
+#if 1
+        printf("tmp:");
+        BNPrintf(tmp);
+        printf("\n");
+#endif
+
+        if (!BN_mod_mul(s, s, tmp, order, ctx))
+        {
+            ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_BN_LIB);
+            goto err;
+        }
+#if 1
+        printf("s:");
+        BNPrintf(s);
+        printf("\n");
+#endif
+        if (BN_is_zero(s))
+        {
+            /* if k and r have been supplied by the caller
+             * don't to generate new k and r values */
+            if (in_k != NULL && in_r != NULL)
+            {
+                ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ECDSA_R_NEED_NEW_SETUP_VALUES);
+                goto err;
+            }
+        }
+        else {
+            BN_rand(tmp, 256, 0xffffffff, 0);
+#if 1
+            printf("tmp:");
+            BNPrintf(tmp);
+            printf("\n");
+#endif
+
+#if 0
+            printf("break\n");
+#endif
+            /* s != 0 => we have a valid signature */
+            break;
+        }
+    }
+    while (1);
+
+    ok = 1;
 err:
-	if (!ok)
-	{
-		ECDSA_SIG_free(ret);
-		ret = NULL;
-	}
-	if (ctx)
-		BN_CTX_free(ctx);
-	if (m)
-		BN_clear_free(m);
-	if (tmp)
-		BN_clear_free(tmp);
-	if (order)
-		BN_free(order);
-	if (k)
-		BN_clear_free(k);
-	if (x)
-		BN_clear_free(x);
-	if (a)
-		BN_clear_free(a);
-	return ret;
+    if (!ok)
+    {
+        ECDSA_SIG_free(ret);
+        ret = NULL;
+    }
+    if (ctx)
+        BN_CTX_free(ctx);
+    if (m)
+        BN_clear_free(m);
+    if (tmp)
+        BN_clear_free(tmp);
+    if (order)
+        BN_free(order);
+    if (k)
+        BN_clear_free(k);
+    if (x)
+        BN_clear_free(x);
+    if (a)
+        BN_clear_free(a);
+    return ret;
 }
 
 static int sm2_do_verify(const unsigned char *dgst, int dgst_len,
