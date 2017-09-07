@@ -741,7 +741,7 @@ int SM2_Test_Vecotor3()
     printf("\n");
 
 #if 1
-    ecsig = sm2_do_sign(digest, 32, priv, randx, eckey);
+    ecsig = sm2_do_sign(digest, 32, rand, randx, eckey);
 #else
     if (!SM2_sign_ex(1, digest, 32, signature, &sig_len, priv, pubx, eckey))
     {
