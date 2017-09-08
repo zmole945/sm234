@@ -574,6 +574,8 @@ int SM2_Test_Vecotor3()
     int	sig_len;
     int i;
 
+    int ret;
+
     unsigned char	digest[32] = {
         0x54, 0x90, 0xfc, 0x4d,
         0xf4, 0x6a, 0xa3, 0x3f,
@@ -742,6 +744,20 @@ int SM2_Test_Vecotor3()
 
 #if 1
     ecsig = sm2_do_sign(digest, 32, rand, randx, eckey);
+
+    fprintf(stdout, "r = ");
+    BNPrintf(ecsig->r);
+    printf("\n");
+    fprintf(stdout, "s = ");
+    BNPrintf(ecsig->s);
+    printf("\n");
+    printf("\n\n\n");
+
+    printf("================================================\n");
+    printf("Testing verify:\n");
+    ret = sm2_do_verify(digest, 32, ecsig, eckey);
+
+    printf("ret = %d\n", ret);
 #else
     if (!SM2_sign_ex(1, digest, 32, signature, &sig_len, priv, pubx, eckey))
     {
@@ -765,13 +781,6 @@ int SM2_Test_Vecotor3()
     signature_tmp = signature;
     d2i_ECDSA_SIG(&ecsig, &signature_tmp, sig_len);
 #endif
-    fprintf(stdout, "r = ");
-    BNPrintf(ecsig->r);
-    printf("\n");
-    fprintf(stdout, "s = ");
-    BNPrintf(ecsig->s);
-    printf("\n");
-    printf("\n\n\n");
 
 builtin_err:	
     OPENSSL_free(signature);

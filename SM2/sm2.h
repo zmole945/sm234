@@ -24,5 +24,13 @@ int SM2_verify(int type, const unsigned char *dgst, int dgst_len,
 int SM2_DH_key(const EC_GROUP * group,const EC_POINT *b_pub_key_r, const EC_POINT *b_pub_key, const BIGNUM *a_r,EC_KEY *a_eckey,
 			   unsigned char *outkey,size_t keylen);
 
-ECDSA_SIG *sm2_do_sign(const unsigned char *dgst, int dgst_len, const BIGNUM *in_k, const BIGNUM *in_r, EC_KEY *eckey);
+ECDSA_SIG *sm2_do_sign(const unsigned char *dgst,
+    int             dgst_len,
+    const BIGNUM    *in_k,
+    const BIGNUM    *in_r,
+    EC_KEY          *eckey);
 
+int sm2_do_verify(const unsigned char *dgst,
+    int             dgst_len,
+    const ECDSA_SIG *sig,
+    EC_KEY          *eckey);
