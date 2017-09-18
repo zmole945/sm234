@@ -15,6 +15,7 @@ $(PROJECT) :
 
 clean:
 	rm -rf *.o *.a *.so
+	rm -rf sm3test
 
 %.o : %.cpp
 	$(CC) $(SHARED_FLAG) -c $< $(INC)
