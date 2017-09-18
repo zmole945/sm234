@@ -3,20 +3,33 @@
 #include <stdio.h>
 #include "sm3.h"
 
+static void test1(void);
+static void test2(void);
 static void test_msg(void);
 
 int main( int argc, char *argv[] )
 {
-    unsigned char *input = "abc";
-    int ilen = 3;
-    unsigned char output[32];
+    test1();
+
+    test2();
+
+    test_msg();
+
+    //getch();	//VS2008
+}
+
+static void test1(void)
+{
     int i;
-    sm3_context ctx;
+    unsigned char input[] = "abc";
+    unsigned char output[32];
+    int ilen = 3;
 
     printf("Message:\n");
     printf("%s\n",input);
 
     sm3(input, ilen, output);
+
     printf("Hash:\n   ");
     for(i=0; i<32; i++)
     {
@@ -24,6 +37,16 @@ int main( int argc, char *argv[] )
         if (((i+1) % 4 ) == 0) printf(" ");
     }
     printf("\n");
+
+}
+
+static void test2(void)
+{
+    unsigned char *input = "abc";
+    int ilen = 3;
+    unsigned char output[32];
+    int i;
+    sm3_context ctx;
 
     printf("Message:\n");
     for(i=0; i < 16; i++)
@@ -43,10 +66,6 @@ int main( int argc, char *argv[] )
         if (((i+1) % 4 ) == 0) printf(" ");
     }
     printf("\n");
-
-    test_msg();
-
-    //getch();	//VS2008
 }
 
 static void test_msg(void)

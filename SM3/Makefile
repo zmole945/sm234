@@ -10,7 +10,7 @@ MODULE =  -lcrypto
 
 all : ${OBJ} $(PROJECT)
 
-$(PROJECT) :
+$(PROJECT) : ${OBJ}
 	$(CC) ${OBJ} -o $(PROJECT) $(INC) $(MODULE)
 
 clean:
