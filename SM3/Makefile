@@ -13,6 +13,9 @@ all : ${OBJ} $(PROJECT)
 $(PROJECT) : ${OBJ}
 	$(CC) ${OBJ} -o $(PROJECT) $(INC) $(MODULE)
 
+run :
+	./$(PROJECT)
+
 clean:
 	rm -rf *.o *.a *.so
 	rm -rf sm3test

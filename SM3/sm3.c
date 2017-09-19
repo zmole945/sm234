@@ -64,10 +64,10 @@ void sm3_starts( sm3_context *ctx )
 
 static void sm3_process( sm3_context *ctx, unsigned char data[64] )
 {
-    unsigned long SS1, SS2, TT1, TT2, W[68],W1[64];
-    unsigned long A, B, C, D, E, F, G, H;
-	unsigned long T[64];
-	unsigned long Temp1,Temp2,Temp3,Temp4,Temp5;
+    unsigned int SS1, SS2, TT1, TT2, W[68],W1[64];
+    unsigned int A, B, C, D, E, F, G, H;
+    unsigned int T[64];
+    unsigned int Temp1,Temp2,Temp3,Temp4,Temp5;
 	int j;
 #ifdef _DEBUG
 	int i;
