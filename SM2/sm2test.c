@@ -88,31 +88,24 @@ int SM2_Test_Vecotor3()
 
     ECDSA_SIG *ecsig = NULL;
 
-    ecsig = ECDSA_SIG_new();
-    if (!ecsig) ABORT;
-
+    printf("================================================\n");
+    printf("set curve\n");
     ctx = BN_CTX_new();
     if (!ctx) ABORT;
-
-    group = EC_GROUP_new(EC_GFp_mont_method());
-    if (!group) ABORT;
 
     p = BN_new();
     a = BN_new();
     b = BN_new();
     if (!p || !a || !b) ABORT;
 
-    randx   = BN_new();
-    randy   = BN_new();
-    rand    = BN_new();
-    if (!randx || !randy || !rand) ABORT;
+    group = EC_GROUP_new(EC_GFp_mont_method());
+    if (!group) ABORT;
 
-    printf("================================================\n");
-    printf("set curve GFp\n");
     if (!BN_hex2bn(&p, SM2_P)) ABORT;
     if (!BN_hex2bn(&a, SM2_A)) ABORT;
     if (!BN_hex2bn(&b, SM2_B)) ABORT;
-    if (1 != BN_is_prime_ex(p, BN_prime_checks, ctx, NULL)) ABORT;
+
+    if (!BN_is_prime_ex(p, BN_prime_checks, ctx, NULL)) ABORT;
     if (!EC_GROUP_set_curve_GFp(group, p, a, b, ctx)) ABORT;
     fprintf(stdout, "p = ");
     BNPrintf(p);
@@ -123,27 +116,41 @@ int SM2_Test_Vecotor3()
     fprintf(stdout, "b = ");
     BNPrintf(b);
     printf("\n");
-    fprintf(stdout, "rand = ");
-    BNPrintf(rand);
-    printf("\n");
     printf("\n\n\n");
 
     printf("================================================\n");
-    printf("Chinese sm2 algorithm test -- Generator:\n");
+    printf("choose n and G\n");
     GFp = EC_POINT_new(group);
     if (!GFp) ABORT;
 
-    gfpx = BN_new();
-    gfpy = BN_new();
-    n = BN_new();
+    gfpx    = BN_new();
+    gfpy    = BN_new();
+    n       = BN_new();
     if (!gfpx || !gfpy || !n) ABORT;
 
     if (!BN_hex2bn(&gfpx, SM2_GX)) ABORT;
-    if (!EC_POINT_set_compressed_coordinates_GFp(group, GFp, gfpx, 0, ctx)) ABORT;
-    if (!EC_POINT_is_on_curve(group, GFp, ctx)) ABORT;
+    if (!EC_POINT_set_compressed_coordinates_GFp(
+                group,
+                GFp, 
+                gfpx,
+                0,
+                ctx)) ABORT;
+    if (!EC_POINT_is_on_curve(
+                group,
+                GFp,
+                ctx)) ABORT;
     if (!BN_hex2bn(&n, SM2_N)) ABORT;
-    if (!EC_GROUP_set_generator(group, GFp, n, BN_value_one())) ABORT;
-    if (!EC_POINT_get_affine_coordinates_GFp(group, GFp, gfpx, gfpy, ctx)) ABORT;
+    if (!EC_GROUP_set_generator(
+                group,
+                GFp,
+                n,
+                BN_value_one())) ABORT;
+    if (!EC_POINT_get_affine_coordinates_GFp(
+                group,
+                GFp,
+                gfpx,
+                gfpy,
+                ctx)) ABORT;
     fprintf(stdout, "n = ");
     BNPrintf(n);
     printf("\n");
@@ -157,6 +164,29 @@ int SM2_Test_Vecotor3()
 
     printf("================================================\n");
     printf("Create key:\n");
+    priv = BN_new();
+    pubx = BN_new();
+    puby = BN_new();
+    if (!priv || !pubx || !puby) ABORT;
+
+    PUBp = EC_POINT_new(group);
+    if (!PUBp) ABORT;
+
+    if (!BN_hex2bn(&priv, SM2_PRIV)) ABORT;
+    if (!EC_POINT_mul(
+                group,
+                PUBp,
+                priv,
+                NULL,
+                NULL,
+                ctx)) ABORT;
+    if (!EC_POINT_get_affine_coordinates_GFp(
+                group,
+                PUBp,
+                pubx,
+                puby,
+                ctx)) ABORT;
+
     if ((eckey = EC_KEY_new()) == NULL)
         goto builtin_err;
     if (EC_KEY_set_group(eckey, group) == 0)
@@ -164,27 +194,6 @@ int SM2_Test_Vecotor3()
         fprintf(stdout," failed\n");
         goto builtin_err;
     }
-
-    priv = BN_new();
-    pubx = BN_new();
-    puby = BN_new();
-    if (!priv || !pubx || !puby) ABORT;
-    PUBp = EC_POINT_new(group);
-    if (!PUBp) ABORT;
-
-    if (!BN_hex2bn(&priv, SM2_PRIV)) ABORT;
-    if (!EC_POINT_mul(group, PUBp, priv, NULL, NULL, ctx)) ABORT;
-    if (!EC_POINT_get_affine_coordinates_GFp(group, PUBp, pubx, puby, ctx)) ABORT;
-    fprintf(stdout, "priv = ");
-    BNPrintf(priv);
-    printf("\n");
-    fprintf(stdout, "pubx = ");
-    BNPrintf(pubx);
-    printf("\n");
-    fprintf(stdout, "puby = ");
-    BNPrintf(puby);
-    printf("\n");
-    printf("\n\n\n");
 
     EC_KEY_set_private_key(eckey, priv);
     EC_KEY_set_public_key(eckey, PUBp);
@@ -196,9 +205,24 @@ int SM2_Test_Vecotor3()
         goto builtin_err;
     }
 
-    sig_len = ECDSA_size(eckey);
-    if ((signature = OPENSSL_malloc(sig_len)) == NULL)
-        goto builtin_err;
+    fprintf(stdout, "priv = ");
+    BNPrintf(priv);
+    printf("\n");
+    fprintf(stdout, "pubx = ");
+    BNPrintf(pubx);
+    printf("\n");
+    fprintf(stdout, "puby = ");
+    BNPrintf(puby);
+    printf("\n");
+    printf("\n\n\n");
+
+    
+    printf("================================================\n");
+    printf("get r and rG\n");
+    rand    = BN_new();
+    randx   = BN_new();
+    randy   = BN_new();
+    if (!randx || !randy || !rand) ABORT;
 
     RANDp = EC_POINT_new(group);
     if (!RANDp) ABORT;
@@ -233,6 +257,13 @@ int SM2_Test_Vecotor3()
         printf("%02X", digest[i]);
     }
     printf("\n");
+
+    sig_len = ECDSA_size(eckey);
+    if ((signature = OPENSSL_malloc(sig_len)) == NULL)
+        goto builtin_err;
+
+    ecsig = ECDSA_SIG_new();
+    if (!ecsig) ABORT;
 
     ecsig = sm2_do_sign(digest, 32, rand, randx, eckey);
 

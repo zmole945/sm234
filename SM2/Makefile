@@ -10,7 +10,7 @@ MODULE =  -lcrypto
 
 all : ${OBJ} $(PROJECT)
 
-$(PROJECT) :
+$(PROJECT) : ${OBJ}
 	$(CC) ${OBJ} -o $(PROJECT) $(INC) $(MODULE)
 
 clean:
@@ -19,5 +19,5 @@ clean:
 
 %.o : %.cpp
 	$(CC) $(SHARED_FLAG) -c $< $(INC)
-%.o : %.c
+%.o : %.c %.h
 	$(CC) $(SHARED_FLAG) -c $< $(INC)
