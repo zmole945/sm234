@@ -25,299 +25,181 @@ static void BNPrintf(BIGNUM* bn)
     OPENSSL_free(p);
 }
 
-
-static int sm2_sign_setup(
-        EC_KEY *eckey,
-        BN_CTX *ctx_in,
-        BIGNUM **kp,
-        BIGNUM **rp)
-{
-    BN_CTX      *ctx = NULL;
-    BIGNUM	*k = NULL, *r = NULL, *order = NULL, *X = NULL;
-    EC_POINT *tmp_point=NULL;
-    const EC_GROUP *group;
-    int 	 ret = 0;
-
-    if (eckey == NULL || (group = EC_KEY_get0_group(eckey)) == NULL)
-    {
-        ECDSAerr(ECDSA_F_ECDSA_SIGN_SETUP, ERR_R_PASSED_NULL_PARAMETER);
-        return 0;
-    }
-
-    if (ctx_in == NULL) 
-    {
-        if ((ctx = BN_CTX_new()) == NULL)
-        {
-            ECDSAerr(ECDSA_F_ECDSA_SIGN_SETUP,ERR_R_MALLOC_FAILURE);
-            return 0;
-        }
-    }
-    else
-        ctx = ctx_in;
-
-    k     = BN_new();	/* this value is later returned in *kp */
-    r     = BN_new();	/* this value is later returned in *rp */
-    order = BN_new();
-    X     = BN_new();
-    if (!k || !r || !order || !X)
-    {
-        ECDSAerr(ECDSA_F_ECDSA_SIGN_SETUP, ERR_R_MALLOC_FAILURE);
-        goto err;
-    }
-    if ((tmp_point = EC_POINT_new(group)) == NULL)
-    {
-        ECDSAerr(ECDSA_F_ECDSA_SIGN_SETUP, ERR_R_EC_LIB);
-        goto err;
-    }
-    if (!EC_GROUP_get_order(group, order, ctx))
-    {
-        ECDSAerr(ECDSA_F_ECDSA_SIGN_SETUP, ERR_R_EC_LIB);
-        goto err;
-    }
-
-    do
-    {
-        /* get random k */	
-        do
-            if (!BN_rand_range(k, order))
-            {
-                ECDSAerr(
-                        ECDSA_F_ECDSA_SIGN_SETUP,
-                        ECDSA_R_RANDOM_NUMBER_GENERATION_FAILED);	
-                goto err;
-            }
-        while (BN_is_zero(k));
-
-        /* compute r the x-coordinate of generator * k */
-        if (!EC_POINT_mul(
-                    group,
-                    tmp_point,
-                    k,
-                    NULL,
-                    NULL,
-                    ctx))
-        {
-            ECDSAerr(ECDSA_F_ECDSA_SIGN_SETUP, ERR_R_EC_LIB);
-            goto err;
-        }
-        if (EC_METHOD_get_field_type(EC_GROUP_method_of(group)) 
-                == NID_X9_62_prime_field)
-        {
-            if (!EC_POINT_get_affine_coordinates_GFp(
-                        group,
-                        tmp_point, 
-                        X, 
-                        NULL,
-                        ctx))
-            {
-                ECDSAerr(ECDSA_F_ECDSA_SIGN_SETUP,ERR_R_EC_LIB);
-                goto err;
-            }
-        }
-        else /* NID_X9_62_characteristic_two_field */
-        {
-            if (!EC_POINT_get_affine_coordinates_GF2m(
-                        group,
-                        tmp_point,
-                        X,
-                        NULL,
-                        ctx))
-            {
-                ECDSAerr(ECDSA_F_ECDSA_SIGN_SETUP,ERR_R_EC_LIB);
-                goto err;
-            }
-        }
-        if (!BN_nnmod(r, X, order, ctx))
-        {
-            ECDSAerr(ECDSA_F_ECDSA_SIGN_SETUP, ERR_R_BN_LIB);
-            goto err;
-        }
-    }
-    while (BN_is_zero(r));
-
-    /* compute the inverse of k */
-    // 	if (!BN_mod_inverse(k, k, order, ctx))
-    // 	{
-    // 		ECDSAerr(ECDSA_F_ECDSA_SIGN_SETUP, ERR_R_BN_LIB);
-    // 		goto err;	
-    // 	}
-    /* clear old values if necessary */
-    if (*rp != NULL)
-        BN_clear_free(*rp);
-    if (*kp != NULL) 
-        BN_clear_free(*kp);
-    /* save the pre-computed values  */
-    *rp = r;
-    *kp = k;
-    ret = 1;
-err:
-    if (!ret)
-    {
-        if (k != NULL) BN_clear_free(k);
-        if (r != NULL) BN_clear_free(r);
-    }
-    if (ctx_in == NULL) 
-        BN_CTX_free(ctx);
-    if (order != NULL)
-        BN_free(order);
-    if (tmp_point != NULL) 
-        EC_POINT_free(tmp_point);
-    if (X)
-        BN_clear_free(X);
-    return(ret);
-}
-
-
 ECDSA_SIG *sm2_do_sign(
         const unsigned char *dgst,
         int                 dgst_len,
-        const BIGNUM        *in_k,
-        const BIGNUM        *in_r,
+        const BIGNUM        *rand,
+        const BIGNUM        *rGx,
         EC_KEY              *eckey)
 {
-    int             ok = 0, i;
-    BIGNUM          *k=NULL, *s, *m=NULL,*tmp=NULL,*order=NULL;
-    const BIGNUM    *ck;
-    BN_CTX          *ctx = NULL;
-    const EC_GROUP  *group;
-    ECDSA_SIG       *ret;
+    int         ok = 0;
+    int         i;
+    ECDSA_SIG   *ret;
+    BN_CTX      *ctx = NULL;
+    EC_GROUP    *group;
 
-    //ECDSA_DATA *ecdsa;
-    const BIGNUM    *priv_key;
-    BIGNUM          *r,*x=NULL,*a=NULL;	//new added
+    BIGNUM      *s, *m=NULL,*tmp=NULL,*n=NULL;
+    BIGNUM      *k;
+    BIGNUM      *r,*one=NULL;
 
-    //ecdsa    = ecdsa_check(eckey);
-    group    = EC_KEY_get0_group(eckey);
-    priv_key = EC_KEY_get0_private_key(eckey);
+    group   = EC_KEY_get0_group(eckey);
+    k       = EC_KEY_get0_private_key(eckey);
 
-    if (group == NULL || priv_key == NULL /*|| ecdsa == NULL*/)
-    {
+    if (group == NULL || k == NULL) {
         ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_PASSED_NULL_PARAMETER);
         return NULL;
     }
 
     ret = ECDSA_SIG_new();
-    if (!ret)
-    {
+    if (!ret) {
         ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_MALLOC_FAILURE);
         return NULL;
     }
+
     s = ret->s;
     r = ret->r;
 
-    if ((ctx = BN_CTX_new()) == NULL ||
-        (order = BN_new()) == NULL ||
-        (tmp = BN_new()) == NULL ||
-        (m = BN_new()) == NULL || 
-        (x = BN_new()) == NULL ||
-        (a = BN_new()) == NULL)
-    {
+    if (    (ctx = BN_CTX_new()) == NULL ||
+            (n = BN_new()) == NULL ||
+            (tmp = BN_new()) == NULL ||
+            (m = BN_new()) == NULL || 
+            (one = BN_new()) == NULL) {
         ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_MALLOC_FAILURE);
         goto err;
     }
 
-    if (!EC_GROUP_get_order(group, order, ctx))
-    {
+    if (!EC_GROUP_get_order(group, n, ctx)) {
         ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_EC_LIB);
         goto err;
     }
 
-    i = BN_num_bits(order);
-
-    /* Need to truncate digest if it is too long: first truncate whole
-     * bytes.
-     */
-    if (8 * dgst_len > i)
-        dgst_len = (i + 7)/8;
-    if (!BN_bin2bn(dgst, dgst_len, m))
-    {
+    i = BN_num_bits(n);
+    if (8 * dgst_len > i) dgst_len = (i + 7)/8;
+    if (!BN_bin2bn(dgst, dgst_len, m)) {
         ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_BN_LIB);
         goto err;
     }
-    /* If still too long truncate remaining bits with a shift */
-    if ((8 * dgst_len > i) && !BN_rshift(m, m, 8 - (i & 0x7)))
-    {
+    if ((8 * dgst_len > i) && !BN_rshift(m, m, 8 - (i & 0x7))) {
         ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_BN_LIB);
         goto err;
     }
 
-    do
-    {
-        if (in_k == NULL || in_r == NULL)
-        {
-            if (!sm2_sign_setup(eckey, ctx, &k, &x))
-            {
-                ECDSAerr(ECDSA_F_ECDSA_DO_SIGN,ERR_R_ECDSA_LIB);
-                goto err;
-            }
-            ck = k;
-        }
-        else
-        {
-            ck  = in_k;
-            if (BN_copy(x, in_r) == NULL)
-            {
-                ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_MALLOC_FAILURE);
-                goto err;
-            }
-        }
-
-        //r=(e+x1) mod n
-        if (!BN_mod_add_quick(r, m, x, order))
-        {
+    do {
+        //r=(e+x1) mod n ----- r = (m+rGx) mod n
+        if (!BN_mod_add_quick(r, m, rGx, n)) {
             ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_BN_LIB);
             goto err;
         }
+        printf("=================\n");
+        printf("r = (m+rGx) mod n\n");
+        printf("m=");
+        BNPrintf(m);
+        printf("\n");
+        printf("rGx=");
+        BNPrintf(rGx);
+        printf("\n");
+        printf("n=");
+        BNPrintf(n);
+        printf("\n");
+        printf("r=");
+        BNPrintf(r);
+        printf("\n");
 
-        if(BN_is_zero(r) )
-            continue;
+        if(BN_is_zero(r)) continue;
 
-        BN_add(tmp, r, ck);
-        if(BN_ucmp(tmp,order) == 0)
-            continue;
+#if 1
+        //rand = rand ---- tmp = r + rand
+        BN_add(tmp, r, rand);
+        printf("tmp=");
+        BNPrintf(tmp);
+        printf("\n");
+        if(BN_ucmp(tmp, n) == 0) continue;
+#endif
 
-        if (!BN_mod_mul(tmp, priv_key, r, order, ctx))
-        {
+        //tmp = k*r mod n
+        if (!BN_mod_mul(tmp, k, r, n, ctx)) {
             ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_BN_LIB);
             goto err;
         }
+        printf("k=");
+        BNPrintf(k);
+        printf("\n");
+        printf("r=");
+        BNPrintf(r);
+        printf("\n");
+        printf("n=");
+        BNPrintf(n);
+        printf("\n");
+        printf("tmp=");
+        BNPrintf(tmp);
+        printf("\n");
 
-        if (!BN_mod_sub_quick(s, ck, tmp, order))
-        {
+        //s = (rand - tmp) mod n
+        if (!BN_mod_sub_quick(s, rand, tmp, n)) {
             ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_BN_LIB);
             goto err;
         }
-        BN_one(a);
+        printf("s=");
+        BNPrintf(s);
+        printf("\n");
+        printf("rand=");
+        BNPrintf(rand);
+        printf("\n");
+        printf("tmp=");
+        BNPrintf(tmp);
+        printf("\n");
+        printf("n=");
+        BNPrintf(n);
+        printf("\n");
 
-        if (!BN_mod_add_quick(tmp, priv_key, a, order))
-        {
+        BN_one(one);
+        printf("one=");
+        BNPrintf(one);
+        printf("\n");
+
+        // tmp = (k+1) mod n
+        if (!BN_mod_add_quick(tmp, k, one, n)) {
             ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_BN_LIB);
             goto err;
         }
-        /* compute the inverse of 1+dA */
-        if (!BN_mod_inverse(tmp, tmp, order, ctx))
-        {
+        printf("tmp=");
+        BNPrintf(tmp);
+        printf("\n");
+        printf("k=");
+        BNPrintf(k);
+        printf("\n");
+        printf("one=");
+        BNPrintf(one);
+        printf("\n");
+        printf("n=");
+        BNPrintf(n);
+        printf("\n");
+        //tmp = 1/tmp mod n
+        if (!BN_mod_inverse(tmp, tmp, n, ctx)) {
             ECDSAerr(ECDSA_F_ECDSA_SIGN_SETUP, ERR_R_BN_LIB);
             goto err;	
         }
+        printf("tmp=");
+        BNPrintf(tmp);
+        printf("\n");
+        printf("n=");
+        BNPrintf(n);
+        printf("\n");
 
-        if (!BN_mod_mul(s, s, tmp, order, ctx))
-        {
+        //s = s*tmp mod n
+        if (!BN_mod_mul(s, s, tmp, n, ctx)) {
             ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_BN_LIB);
             goto err;
         }
 
-        if (BN_is_zero(s))
-        {
+        if (BN_is_zero(s)) {
             /* if k and r have been supplied by the caller
              * don't to generate new k and r values */
-            if (in_k != NULL && in_r != NULL)
-            {
+            if (rand != NULL && rGx != NULL) {
                 ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ECDSA_R_NEED_NEW_SETUP_VALUES);
                 goto err;
             }
-        }
-        else {
+        } else {
             BN_rand(tmp, 256, 0xffffffff, 0);
 
             /* s != 0 => we have a valid signature */
@@ -328,25 +210,16 @@ ECDSA_SIG *sm2_do_sign(
 
     ok = 1;
 err:
-    if (!ok)
-    {
+    if (!ok) {
         ECDSA_SIG_free(ret);
         ret = NULL;
     }
-    if (ctx)
-        BN_CTX_free(ctx);
-    if (m)
-        BN_clear_free(m);
-    if (tmp)
-        BN_clear_free(tmp);
-    if (order)
-        BN_free(order);
-    if (k)
-        BN_clear_free(k);
-    if (x)
-        BN_clear_free(x);
-    if (a)
-        BN_clear_free(a);
+    if (ctx) BN_CTX_free(ctx);
+    if (m) BN_clear_free(m);
+    if (tmp) BN_clear_free(tmp);
+    if (n) BN_free(n);
+    if (rGx) BN_clear_free(rGx);
+    if (one) BN_clear_free(one);
     return ret;
 }
 

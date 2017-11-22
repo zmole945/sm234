@@ -120,12 +120,12 @@ int SM2_Test_Vecotor3()
 
     printf("================================================\n");
     printf("choose n and G\n");
-    GFp = EC_POINT_new(group);
+    GFp = EC_POINT_new(group);          //基点
     if (!GFp) ABORT;
 
     gfpx    = BN_new();
     gfpy    = BN_new();
-    n       = BN_new();
+    n       = BN_new();                 //order
     if (!gfpx || !gfpy || !n) ABORT;
 
     if (!BN_hex2bn(&gfpx, SM2_GX)) ABORT;
@@ -218,7 +218,7 @@ int SM2_Test_Vecotor3()
 
     
     printf("================================================\n");
-    printf("get r and rG\n");
+    printf("get r and randG\n");
     rand    = BN_new();
     randx   = BN_new();
     randy   = BN_new();
