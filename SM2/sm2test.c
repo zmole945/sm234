@@ -67,7 +67,7 @@ int SM2_Test_Vecotor3()
     EC_GROUP    *group;
     EC_POINT    *GFp, *PUBp, *RANDp;
     BIGNUM      *gfpx, *gfpy, *n;
-    BIGNUM      *randx, *randy, *rand;
+    BIGNUM      *rGx, *rGy, *r;
     BIGNUM      *priv, *pubx, *puby;
     EC_KEY	*eckey = NULL;
 
@@ -151,13 +151,13 @@ int SM2_Test_Vecotor3()
                 gfpx,
                 gfpy,
                 ctx)) ABORT;
-    fprintf(stdout, "n = ");
+    fprintf(stdout, "n      = ");
     BNPrintf(n);
     printf("\n");
-    fprintf(stdout, "gfpx = ");
+    fprintf(stdout, "gfpx   = ");
     BNPrintf(gfpx);
     printf("\n");
-    fprintf(stdout, "gfpy = ");
+    fprintf(stdout, "gfpy   = ");
     BNPrintf(gfpy);
     printf("\n");
     printf("\n\n\n");
@@ -218,35 +218,35 @@ int SM2_Test_Vecotor3()
 
     
     printf("================================================\n");
-    printf("get r and randG\n");
-    rand    = BN_new();
-    randx   = BN_new();
-    randy   = BN_new();
-    if (!randx || !randy || !rand) ABORT;
+    printf("get r and r*G\n");
+    r       = BN_new();
+    rGx   = BN_new();
+    rGy   = BN_new();
+    if (!rGx || !rGy || !r) ABORT;
 
     RANDp = EC_POINT_new(group);
     if (!RANDp) ABORT;
 
-    if (!BN_hex2bn(&rand, SM2_RAND)) ABORT;
-    if (!EC_POINT_mul(group, RANDp, rand, NULL, NULL, ctx))
+    if (!BN_hex2bn(&r, SM2_RAND)) ABORT;
+    if (!EC_POINT_mul(group, RANDp, r, NULL, NULL, ctx))
     {
         fprintf(stdout, " failed\n");
         goto builtin_err;
     }
 
-    if (!EC_POINT_get_affine_coordinates_GFp(group, RANDp, randx, randy, ctx))
+    if (!EC_POINT_get_affine_coordinates_GFp(group, RANDp, rGx, rGy, ctx))
     {
         fprintf(stdout, " failed\n");
         goto builtin_err;
     }
-    fprintf(stdout, "rand = ");
-    BNPrintf(rand);
+    fprintf(stdout, "r  = ");
+    BNPrintf(r);
     printf("\n");
-    fprintf(stdout, "randx = ");
-    BNPrintf(randx);
+    fprintf(stdout, "rGx= ");
+    BNPrintf(rGx);
     printf("\n");
-    fprintf(stdout, "randy = ");
-    BNPrintf(randy);
+    fprintf(stdout, "rGy= ");
+    BNPrintf(rGy);
     printf("\n");
     printf("\n\n\n");
 
@@ -265,12 +265,12 @@ int SM2_Test_Vecotor3()
     ecsig = ECDSA_SIG_new();
     if (!ecsig) ABORT;
 
-    ecsig = sm2_do_sign(digest, 32, rand, randx, eckey);
+    ecsig = sm2_do_sign(digest, 32, r, rGx, eckey);
 
-    fprintf(stdout, "r = ");
+    fprintf(stdout, "sigr = ");
     BNPrintf(ecsig->r);
     printf("\n");
-    fprintf(stdout, "s = ");
+    fprintf(stdout, "sigs = ");
     BNPrintf(ecsig->s);
     printf("\n");
     printf("\n\n\n");

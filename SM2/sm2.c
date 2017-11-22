@@ -28,7 +28,7 @@ static void BNPrintf(BIGNUM* bn)
 ECDSA_SIG *sm2_do_sign(
         const unsigned char *dgst,
         int                 dgst_len,
-        const BIGNUM        *rand,
+        const BIGNUM        *r,
         const BIGNUM        *rGx,
         EC_KEY              *eckey)
 {
@@ -38,9 +38,9 @@ ECDSA_SIG *sm2_do_sign(
     BN_CTX      *ctx = NULL;
     EC_GROUP    *group;
 
-    BIGNUM      *s, *m=NULL,*tmp=NULL,*n=NULL;
+    BIGNUM      *sigs, *m=NULL,*tmp=NULL,*n=NULL;
     BIGNUM      *k;
-    BIGNUM      *r,*one=NULL;
+    BIGNUM      *sigr,*one=NULL;
 
     group   = EC_KEY_get0_group(eckey);
     k       = EC_KEY_get0_private_key(eckey);
@@ -56,8 +56,8 @@ ECDSA_SIG *sm2_do_sign(
         return NULL;
     }
 
-    s = ret->s;
-    r = ret->r;
+    sigs = ret->s;
+    sigr = ret->r;
 
     if (    (ctx = BN_CTX_new()) == NULL ||
             (n = BN_new()) == NULL ||
@@ -85,124 +85,143 @@ ECDSA_SIG *sm2_do_sign(
     }
 
     do {
-        //r=(e+x1) mod n ----- r = (m+rGx) mod n
-        if (!BN_mod_add_quick(r, m, rGx, n)) {
+        //sigr=(e+x1) mod n ----- sigr = (m+rGx) mod n
+        if (!BN_mod_add_quick(sigr, m, rGx, n)) {
             ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_BN_LIB);
             goto err;
         }
         printf("=================\n");
-        printf("r = (m+rGx) mod n\n");
-        printf("m=");
+        printf("sigr = (m+rGx) mod n\n");
+        printf("m   = ");
         BNPrintf(m);
         printf("\n");
-        printf("rGx=");
+        printf("rGx = ");
         BNPrintf(rGx);
         printf("\n");
-        printf("n=");
+        printf("n   = ");
         BNPrintf(n);
         printf("\n");
-        printf("r=");
-        BNPrintf(r);
+        printf("sigr= ");
+        BNPrintf(sigr);
         printf("\n");
 
-        if(BN_is_zero(r)) continue;
+        if(BN_is_zero(sigr)) continue;
 
 #if 1
-        //rand = rand ---- tmp = r + rand
-        BN_add(tmp, r, rand);
-        printf("tmp=");
+        //tmp = sigr + r
+        printf("=================\n");
+        printf("tmp = sigr + r\n");
+        BN_add(tmp, sigr, r);
+        printf("tmp = ");
         BNPrintf(tmp);
         printf("\n");
         if(BN_ucmp(tmp, n) == 0) continue;
 #endif
 
-        //tmp = k*r mod n
-        if (!BN_mod_mul(tmp, k, r, n, ctx)) {
+        //tmp = k*sigr mod n
+        if (!BN_mod_mul(tmp, k, sigr, n, ctx)) {
             ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_BN_LIB);
             goto err;
         }
-        printf("k=");
+        printf("=================\n");
+        printf("tmp = k*sigr mod n\n");
+        printf("k   = ");
         BNPrintf(k);
         printf("\n");
-        printf("r=");
-        BNPrintf(r);
+        printf("sigr= ");
+        BNPrintf(sigr);
         printf("\n");
-        printf("n=");
+        printf("n   = ");
         BNPrintf(n);
         printf("\n");
-        printf("tmp=");
+        printf("tmp = ");
         BNPrintf(tmp);
         printf("\n");
 
-        //s = (rand - tmp) mod n
-        if (!BN_mod_sub_quick(s, rand, tmp, n)) {
+        //sigs = (r - tmp) mod n
+        if (!BN_mod_sub_quick(sigs, r, tmp, n)) {
             ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_BN_LIB);
             goto err;
         }
-        printf("s=");
-        BNPrintf(s);
+        printf("=================\n");
+        printf("sigs = (r - tmp) mod n\n");
+        printf("r   = ");
+        BNPrintf(r);
         printf("\n");
-        printf("rand=");
-        BNPrintf(rand);
-        printf("\n");
-        printf("tmp=");
+        printf("tmp = ");
         BNPrintf(tmp);
         printf("\n");
-        printf("n=");
+        printf("n   = ");
         BNPrintf(n);
         printf("\n");
-
-        BN_one(one);
-        printf("one=");
-        BNPrintf(one);
+        printf("sigs= ");
+        BNPrintf(sigs);
         printf("\n");
 
         // tmp = (k+1) mod n
+        BN_one(one);
         if (!BN_mod_add_quick(tmp, k, one, n)) {
             ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_BN_LIB);
             goto err;
         }
-        printf("tmp=");
-        BNPrintf(tmp);
-        printf("\n");
-        printf("k=");
+        printf("=================\n");
+        printf("tmp = (k+1) mod n\n");
+        printf("k   = ");
         BNPrintf(k);
         printf("\n");
-        printf("one=");
+        printf("one = ");
         BNPrintf(one);
         printf("\n");
-        printf("n=");
+        printf("n   = ");
         BNPrintf(n);
         printf("\n");
+        printf("tmp = ");
+        BNPrintf(tmp);
+        printf("\n");
+
         //tmp = 1/tmp mod n
         if (!BN_mod_inverse(tmp, tmp, n, ctx)) {
             ECDSAerr(ECDSA_F_ECDSA_SIGN_SETUP, ERR_R_BN_LIB);
             goto err;	
         }
-        printf("tmp=");
-        BNPrintf(tmp);
-        printf("\n");
-        printf("n=");
+        printf("=================\n");
+        printf("tmp = 1/tmp mod n\n");
+        printf("n   = ");
         BNPrintf(n);
         printf("\n");
+        printf("tmp = ");
+        BNPrintf(tmp);
+        printf("\n");
 
-        //s = s*tmp mod n
-        if (!BN_mod_mul(s, s, tmp, n, ctx)) {
+        //sigs = sigs*tmp mod n
+        if (!BN_mod_mul(sigs, sigs, tmp, n, ctx)) {
             ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ERR_R_BN_LIB);
             goto err;
         }
+        printf("=================\n");
+        printf("sigs = sigs*tmp mod n\n");
+        printf("tmp = ");
+        BNPrintf(tmp);
+        printf("\n");
+        printf("n   = ");
+        BNPrintf(n);
+        printf("\n");
+        printf("sigs= ");
+        BNPrintf(sigs);
+        printf("\n");
 
-        if (BN_is_zero(s)) {
+
+        if (BN_is_zero(sigs)) {
             /* if k and r have been supplied by the caller
              * don't to generate new k and r values */
-            if (rand != NULL && rGx != NULL) {
+            if (r != NULL && rGx != NULL) {
                 ECDSAerr(ECDSA_F_ECDSA_DO_SIGN, ECDSA_R_NEED_NEW_SETUP_VALUES);
                 goto err;
             }
         } else {
             BN_rand(tmp, 256, 0xffffffff, 0);
 
-            /* s != 0 => we have a valid signature */
+            /* sigs != 0 => we have a valid signature */
             break;
         }
     }
